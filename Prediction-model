@@ -1,0 +1,264 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Nov 27 21:39:47 2024
+
+@author: LAPTOP
+"""
+
+import streamlit as st
+import numpy as np
+import joblib
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Load the trained model
+model = joblib.load("diabetes_prediction_model.pkl")
+import sqlite3
+
+# Create or connect to SQLite database
+conn = sqlite3.connect('diabetes_predictions.db')
+cursor = conn.cursor()
+
+# Create a table for storing predictions
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS Predictions (
+    Pregnancies INTEGER,
+    Glucose INTEGER,
+    BloodPressure INTEGER,
+    SkinThickness INTEGER,
+    Insulin INTEGER,
+    BMI REAL,
+    DiabetesPedigreeFunction REAL,
+    Age INTEGER,
+    Prediction TEXT,
+    CurrentGlucose REAL,
+    DailyGlucoseReduction REAL,
+    DaysNeeded REAL,
+    CurrentBMI REAL,
+    BMIStatus TEXT
+)
+""")
+conn.commit()
+# App title
+st.title("Diabetes Prediction, BMI, and Glucose Management App")
+
+# Section 1: Diabetes Prediction
+st.header("Diabetes Prediction")
+st.header("Enter Patient Details:")
+# getting the input data from the user
+col1, col2, col3 = st.columns(3)
+# Input fields for user data
+with col1:
+ pregnancies = st.number_input("Pregnancies", min_value=0, max_value=20, step=1, value=0)
+with col2:
+ glucose = st.number_input("Glucose Level", min_value=0, max_value=300, step=1, value=120)
+with col3:
+ blood_pressure = st.number_input("Blood Pressure (mmHg)", min_value=0, max_value=180, step=1, value=70)
+with col1:
+ skin_thickness = st.number_input("Skin Thickness (mm)", min_value=0, max_value=100, step=1, value=20)
+with col2:
+ insulin = st.number_input("Insulin Level (IU/mL)", min_value=0, max_value=900, step=1, value=80)
+with col3:
+ bmi = st.number_input("BMI (Body Mass Index)", min_value=0.0, max_value=70.0, step=0.1, value=25.0)
+with col1:
+ dpf = st.number_input("Diabetes Pedigree Function", min_value=0.0, max_value=2.5, step=0.01, value=0.5)
+with col2:
+ age = st.number_input("Age", min_value=0, max_value=120, step=1, value=30)
+
+# Predict diabetes when button is clicked
+if st.button("Predict Diabetes"):
+    # Prepare input data
+    input_data = np.array([[pregnancies, glucose, blood_pressure, skin_thickness,
+                            insulin, bmi, dpf, age]])
+    # Make prediction
+    prediction = model.predict(input_data)
+
+    # Display the result
+    if prediction[0] == 1:
+        st.error("The patient is diabetic.")
+    else:
+        st.success("The patient is not diabetic.")
+
+# Section 2: Glucose Management
+st.header("Glucose Management")
+
+# Inputs for glucose management
+current_glucose = st.number_input("Enter your current glucose level (mg/dL):", min_value=0.0, max_value=500.0, step=1.0, value=120.0)
+daily_glucose_reduction = st.number_input("Enter the estimated daily glucose reduction (mg/dL):", min_value=0.0, max_value=20.0, step=0.1, value=2.0)
+
+# Define normal glucose range
+normal_glucose_lower = 70
+normal_glucose_upper = 99
+critical_glucose_level = 180  # Threshold for critical glucose levels
+
+# Analyze glucose level and reduction
+if st.button("Analyze and Calculate Glucose Reduction Time"):
+    # Check if glucose is critically high
+    if current_glucose >= critical_glucose_level:
+        st.warning("Your glucose level is critically high! Please consult a doctor immediately.")
+
+    # Check if the glucose reduction target is too aggressive
+    if daily_glucose_reduction > 5:
+        st.warning("The daily glucose reduction you entered is aggressive. Consult a healthcare provider to ensure this is a safe target.")
+
+    # Analyze if glucose is within the normal range
+    if current_glucose <= normal_glucose_upper:
+        st.success("Your glucose level is already in the non-diabetic range. Maintain your healthy habits!")
+    else:
+        # Calculate how much glucose needs to be reduced
+        reduction_needed = current_glucose - normal_glucose_upper
+        st.warning(f"Your glucose level is high. To reach a normal glucose level, you need to reduce it by {reduction_needed:.2f} mg/dL.")
+
+        # Calculate the time needed to reduce glucose
+        days_needed = reduction_needed / daily_glucose_reduction
+        st.info(f"To reach a non-diabetic glucose level, you need approximately {days_needed:.1f} days, assuming you maintain consistent healthy habits.")
+
+        # Add guidance based on reduction time
+        if days_needed > 30:
+            st.warning("This may take over a month. Consistency is key! Combine a balanced diet with regular physical activity.")
+        elif days_needed <= 7:
+            st.success("Great progress! You're close to reaching a non-diabetic range. Stay consistent!")
+
+    # Additional analysis for glucose below normal range
+    if current_glucose < normal_glucose_lower:
+        increase_needed = normal_glucose_lower - current_glucose
+        st.warning(f"Your glucose level is too low. To reach a normal glucose level, you need to increase it by {increase_needed:.2f} mg/dL.")
+
+# Section 3: BMI Management
+st.header("BMI Analysis")
+
+user_bmi = st.number_input("Enter your current BMI:", min_value=0.0, max_value=70.0, step=0.1, value=25.0)
+
+normal_bmi_lower = 18.5
+normal_bmi_upper = 24.9
+
+if st.button("Analyze BMI"):
+    if user_bmi > normal_bmi_upper:
+        reduction_needed = user_bmi - normal_bmi_upper
+        st.warning(f"Your BMI is high. To reach a normal BMI, you need to reduce your BMI by {reduction_needed:.2f}.")
+    elif user_bmi < normal_bmi_lower:
+        st.warning(f"Your BMI is too low. A normal BMI starts from {normal_bmi_lower}. Consider gaining weight healthily.")
+    else:
+        st.success("Your BMI is within the normal range. Keep maintaining your healthy lifestyle!")
+# Save prediction and additional data to database
+input_data = np.array([[pregnancies, glucose, blood_pressure, skin_thickness,
+                          insulin, bmi, dpf, age]])
+ # Define file path for training data CSV
+training_data_file = "diabetes_training_data.csv"  # Ensure this file exists
+
+if st.button("Save Prediction and Append to Training Data"):
+    prediction_text = "Diabetic" if prediction[0] == 1 else "Non-Diabetic"
+
+    # Glucose management calculations
+    if current_glucose > normal_glucose_upper:
+        reduction_needed = current_glucose - normal_glucose_upper
+        days_needed = reduction_needed / daily_glucose_reduction if daily_glucose_reduction > 0 else None
+    else:
+        reduction_needed = None
+        days_needed = None
+
+    # BMI analysis
+    if user_bmi > normal_bmi_upper:
+        bmi_status = "High"
+    elif user_bmi < normal_bmi_lower:
+        bmi_status = "Low"
+    else:
+        bmi_status = "Normal"
+
+    # Save to database
+    cursor.execute("""
+    INSERT INTO Predictions (
+        Pregnancies, Glucose, BloodPressure, SkinThickness, Insulin, BMI, 
+        DiabetesPedigreeFunction, Age, Prediction, CurrentGlucose, 
+        DailyGlucoseReduction, DaysNeeded, CurrentBMI, BMIStatus
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (pregnancies, glucose, blood_pressure, skin_thickness, insulin, bmi, dpf, age,
+          prediction_text, current_glucose, daily_glucose_reduction, days_needed, user_bmi, bmi_status))
+    conn.commit()
+
+    # Append new data to CSV
+    new_data = {
+        'Pregnancies': pregnancies,
+        'Glucose': glucose,
+        'BloodPressure': blood_pressure,
+        'SkinThickness': skin_thickness,
+        'Insulin': insulin,
+        'BMI': bmi,
+        'DiabetesPedigreeFunction': dpf,
+        'Age': age,
+        'Outcome': 1 if prediction[0] == 1 else 0  # Match format of Outcome in dataset
+    }
+   
+    append_to_diabetes_prediction_model.pkl(training_data_file, new_data)
+    Pregnancies,Glucose,BloodPressure,SkinThickness,Insulin,BMI,DiabetesPedigreeFunction,Age,Outcome
+    if st.button("Retrain Model with Updated Data"):
+     data = pd.read_csv(training_data_file)
+     X = data.iloc[:, :-1]  # Features
+    y = data.iloc[:, -1]   # Target
+    model.fit(X, y)  # Retrain the model
+    joblib.dump(model, "diabetes_prediction_model.pkl")  # Save updated model
+    st.success("Model retrained with the updated dataset!")
+
+
+
+# Section 6: Data Analysis Dashboard
+st.header("Data Analysis Dashboard")
+
+# Check if data exists in the database
+query = "SELECT * FROM Predictions"
+dashboard_data = pd.read_sql(query, conn)
+
+if not dashboard_data.empty:
+    # 1. Show Prediction Count
+    if st.checkbox("Show Prediction Count"):
+        fig, ax = plt.subplots()
+        dashboard_data['Prediction'].value_counts().plot(kind='bar', ax=ax, color=['green', 'red'])
+        ax.set_title("Prediction Count")
+        ax.set_ylabel("Count")
+        ax.set_xlabel("Prediction")
+        st.pyplot(fig)
+
+    # 2. Correlation Heatmap for Numerical Features
+    if st.checkbox("Show Correlation Heatmap"):
+        numeric_columns = dashboard_data.select_dtypes(include=['float64', 'int64']).columns
+        fig, ax = plt.subplots(figsize=(10, 8))
+        sns.heatmap(dashboard_data[numeric_columns].corr(), annot=True, cmap="coolwarm", ax=ax)
+        ax.set_title("Feature Correlations")
+        st.pyplot(fig)
+
+    # 3. Glucose Management Insights
+    if st.checkbox("Show Glucose Insights"):
+        fig, ax = plt.subplots()
+        sns.histplot(dashboard_data['CurrentGlucose'], kde=True, bins=20, ax=ax, color='blue')
+        ax.set_title("Distribution of Glucose Levels")
+        ax.set_xlabel("Glucose Level (mg/dL)")
+        st.pyplot(fig)
+
+    # 4. BMI Status Distribution
+    if st.checkbox("Show BMI Status Distribution"):
+        fig, ax = plt.subplots()
+        dashboard_data['BMIStatus'].value_counts().plot(kind='pie', autopct='%1.1f%%', ax=ax, startangle=90, colors=['orange', 'cyan', 'yellow'])
+        ax.set_title("BMI Status Distribution")
+        ax.set_ylabel("")  # Hide y-axis label
+        st.pyplot(fig)
+
+    else:
+     st.info("No data available for analysis. Save some predictions first!")
+# Section 4: Data Insights
+st.header("Explore Diabetes Dataset Insights")
+
+url = "https://raw.githubusercontent.com/jbrownlee/Datasets/master/pima-indians-diabetes.data.csv"
+column_names = ['Pregnancies', 'Glucose', 'BloodPressure', 'SkinThickness', 'Insulin',
+                'BMI', 'DiabetesPedigreeFunction', 'Age', 'Outcome']
+data = pd.read_csv(url, header=None, names=column_names)
+
+if st.checkbox("Show Dataset"):
+    st.dataframe(data)
+
+if st.checkbox("Show Feature Distribution"):
+    feature = st.selectbox("Select Feature", column_names[:-1])
+    fig, ax = plt.subplots()
+    sns.histplot(data[feature], kde=True, ax=ax)
+    ax.set_title(f"Distribution of {feature}")
+    st.pyplot(fig)

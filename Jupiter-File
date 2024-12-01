@@ -1,0 +1,60 @@
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn import svm
+from sklearn.metrics import accuracy_score
+diabetes_dataset = pd.read_csv('diabetes (1).csv') 
+diabetes_dataset.head()
+diabetes_dataset.shape
+diabetes_dataset.describe()
+# accuracy score on the test data
+X_test_prediction = classifier.predict(X_test)
+test_data_accuracy = accuracy_score(X_test_prediction, Y_test)
+print('Accuracy score of the test data : ', test_data_accuracy)
+# Assuming the classifier outputs HbA1c levels or some measure indicating glucose status
+input_data = (5, 166, 72, 19, 175, 25.8, 0.587, 51,4)
+
+# Converting the input data to a numpy array
+import numpy as np  # Import numpy if not already imported
+input_data_as_numpy_array = np.asarray(input_data)
+
+# Reshape the array as we are predicting for one instance
+input_data_reshaped = input_data_as_numpy_array.reshape(1, -1)
+
+# Simulating a classifier prediction (replace this with your model's prediction)
+# Example: prediction = classifier.predict(input_data_reshaped)
+predicted_value = 9.0  # Example predicted HbA1c level, replace this with `classifier.predict`
+
+# Categorize based on the ranges
+if 4.5 <= predicted_value <= 5.6:
+    print("The person has normal glucose levels.")
+elif 5.7 <= predicted_value <= 6.5:
+    print("The person is at risk of diabetes.")
+elif 6.6 <= predicted_value <= 6.9:
+    print("The person is diabetic.")
+elif 7.0 <= predicted_value <= 8.9:
+    print("The person has uncontrolled diabetes.")
+elif predicted_value >= 9.0:
+    print("The person has critically high glucose levels.")
+else:
+    print("Invalid prediction value.")
+import pickle
+filename = 'diabetes_model.sav'
+pickle.dump(classifier, open(filename, 'wb'))
+# loading the saved model
+loaded_model = pickle.load(open('diabetes_model.sav', 'rb'))
+input_data = (5,170,72,19,175,25.8,0.587,51)
+
+# changing the input_data to numpy array
+input_data_as_numpy_array = np.asarray(input_data)
+
+# reshape the array as we are predicting for one instance
+input_data_reshaped = input_data_as_numpy_array.reshape(1,-1)
+
+prediction = loaded_model.predict(input_data_reshaped)
+print(prediction)
+
+if (prediction[0] == 0):
+  print('The person is not diabetic')
+else:
+  print('The person is diabetic')

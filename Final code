@@ -1,1 +1,99 @@
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+from tkinter import *
+from tkinter import messagebox
 
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import SVC
+
+# =======================
+# 1. Load Dataset
+# =======================
+data = pd.read_csv("diabetes.csv")  # keep dataset in same folder
+
+X = data.drop("Outcome", axis=1)
+y = data["Outcome"]
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+
+# =======================
+# 2. Preprocess
+# =======================
+scaler = StandardScaler()
+X_train = scaler.fit_transform(X_train)
+X_test = scaler.transform(X_test)
+
+# =======================
+# 3. Train Models
+# =======================
+models = {
+    "Logistic Regression": LogisticRegression(max_iter=1000),
+    "Random Forest": RandomForestClassifier(n_estimators=100, random_state=42),
+    "SVM": SVC(kernel='linear', probability=True, random_state=42)
+}
+
+results = {}
+for name, model in models.items():
+    model.fit(X_train, y_train)
+    acc = model.score(X_test, y_test)
+    results[name] = acc
+
+best_model_name = max(results, key=results.get)
+best_model = models[best_model_name]
+
+print(f"✅ Best Model: {best_model_name} with Accuracy = {results[best_model_name]:.2f}")
+
+# =======================
+# 4. Prediction Function
+# =======================
+def predict_diabetes(input_data):
+    input_array = np.array(input_data).reshape(1, -1)
+    input_scaled = scaler.transform(input_array)
+    prediction = best_model.predict(input_scaled)
+    return prediction[0]
+
+# =======================
+# 5. Tkinter GUI
+# =======================
+root = Tk()
+root.title("Diabetes Prediction System")
+root.geometry("400x500")
+root.config(bg="lightblue")
+
+# Labels
+Label(root, text="Diabetes Prediction System", font=("Arial", 16, "bold"), bg="lightblue").pack(pady=10)
+
+fields = ["Pregnancies", "Glucose", "Blood Pressure", "Skin Thickness", "Insulin",
+          "BMI", "Diabetes Pedigree Function", "Age"]
+
+entries = {}
+
+for field in fields:
+    frame = Frame(root, bg="lightblue")
+    frame.pack(pady=5)
+    Label(frame, text=field + ":", font=("Arial", 12), bg="lightblue").pack(side=LEFT, padx=5)
+    entry = Entry(frame, font=("Arial", 12))
+    entry.pack(side=LEFT)
+    entries[field] = entry
+
+# Prediction Button
+def on_predict():
+    try:
+        values = [float(entries[f].get()) for f in fields]
+        result = predict_diabetes(values)
+        if result == 1:
+            messagebox.showerror("Result", "🔴 The person is likely to have Diabetes.")
+        else:
+            messagebox.showinfo("Result", "🟢 The person is NOT likely to have Diabetes.")
+    except:
+        messagebox.showwarning("Input Error", "Please enter valid numeric values!")
+
+Button(root, text="Predict", command=on_predict, font=("Arial", 14, "bold"),
+       bg="green", fg="white", width=15).pack(pady=20)
